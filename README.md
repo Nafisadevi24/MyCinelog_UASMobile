@@ -68,6 +68,11 @@ Mode Gelap (Dark Mode) mengubah keseluruhan tampilan aplikasi ke tema gelap tanp
 > `admin / 12345` dan `nafisa / 12345` (gunakan untuk log in saat pengujian).
 
 ---
+<img width="180" height="400" alt="Screenshot 2025-12-12 160822" src="https://github.com/user-attachments/assets/8ee4fde6-551b-4f76-93de-5765d022d535" />
+<img width="180" height="400" alt="Screenshot 2025-12-12 155504" src="https://github.com/user-attachments/assets/165e7fd9-a481-4b6e-a549-ad16c2ce3564" />
+
+
+---
 
 ## 🧠 Teknologi yang Digunakan
 
@@ -112,5 +117,6 @@ dan dapat digunakan sebagai **media pembelajaran pribadi**.
 **Program Studi:** Teknik Informatika  
 **Universitas Islam Negeri Maulana Malik Ibrahim Malang**  
 **Semester:** Ganjil 2025/2026
+
 
 
