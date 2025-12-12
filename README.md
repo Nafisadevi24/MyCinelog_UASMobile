@@ -65,9 +65,7 @@ Mode Gelap (Dark Mode) mengubah keseluruhan tampilan aplikasi ke tema gelap tanp
 | Akun      | `account_page.dart`   | Profil, dark mode, logout            |
 
 > **Akun contoh untuk pengujian:**  
-> Tersedia di `assets/users.json`  
-> - `admin / 12345`  
-> - `nafisa / 12345`
+> `admin / 12345` dan `nafisa / 12345` (gunakan untuk log in saat pengujian).
 
 ---
 
@@ -124,3 +122,4 @@ dan dapat digunakan sebagai **media pembelajaran pribadi**.
 **Program Studi:** Teknik Informatika  
 **Universitas Islam Negeri Maulana Malik Ibrahim Malang**  
 **Semester:** Ganjil 2025/2026
+
