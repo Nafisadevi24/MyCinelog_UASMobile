@@ -98,16 +98,6 @@ Mode Gelap (Dark Mode) mengubah keseluruhan tampilan aplikasi ke tema gelap tanp
 
 ---
 
-## 🚀 Pengembangan Selanjutnya
-
-Beberapa pengembangan yang dapat dilakukan di versi berikutnya:
-- Sinkronisasi penuh perubahan user ke backend/server
-- Optimalisasi UI/UX dan animasi
-- Upload poster film langsung dari galeri
-- Manajemen state lanjutan (Provider / Riverpod)
-
----
-
 ## 📁 Lisensi
 
 Proyek ini dibuat untuk **keperluan akademik (UAS Mobile Programming)**  
@@ -122,4 +112,5 @@ dan dapat digunakan sebagai **media pembelajaran pribadi**.
 **Program Studi:** Teknik Informatika  
 **Universitas Islam Negeri Maulana Malik Ibrahim Malang**  
 **Semester:** Ganjil 2025/2026
+
 
