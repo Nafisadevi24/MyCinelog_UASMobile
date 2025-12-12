@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../repository/data_repository.dart';
-import '../models/movie_model.dart';
-import 'add_edit_page.dart';
-import 'detail_page.dart';
 import '../widgets/movie_card.dart';
+import '../models/movie_model.dart';
 
 class HomePage extends StatefulWidget {
-  static const routeName = '/home';
-  const HomePage({Key? key}) : super(key: key);
+  static const String routeName = '/home';
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -15,110 +13,130 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final repo = DataRepository();
-  String username = '';
+  bool isLoading = true;
+  bool isError = false;
+  String errorMsg = '';
+  List<Movie> movies = [];
+  final TextEditingController searchC = TextEditingController();
 
   @override
-void initState() {
-  super.initState();
-  _initData();
-}
-
-Future<void> _initData() async {
-  await repo.loadInitialData();
-  await repo.reloadMovies();
-  setState(() {});
-}
-
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final arg = ModalRoute.of(context)!.settings.arguments;
-    if (arg is String) username = arg;
+  void initState() {
+    super.initState();
+    loadMovies();
   }
 
-  Future<void> refresh() async {
-    await repo.reloadMovies();
-    setState(() {});
+  Future<void> loadMovies() async {
+    setState(() {
+      isLoading = true;
+      isError = false;
+    });
+
+    try {
+      await repo.loadMoviesFromApi();
+      setState(() {
+        movies = repo.getAllMovies();
+      });
+    } catch (e) {
+      setState(() {
+        isError = true;
+        errorMsg = e.toString();
+      });
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  Future<void> searchMovies() async {
+    setState(() {
+      isLoading = true;
+      isError = false;
+    });
+
+    try {
+      await repo.searchMovies(searchC.text);
+      setState(() => movies = repo.getAllMovies());
+    } catch (e) {
+      setState(() {
+        isError = true;
+        errorMsg = e.toString();
+      });
+    }
+
+    setState(() => isLoading = false);
+  }
+
+  @override
+  void dispose() {
+    searchC.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final movies = repo.getAllMovies();
-
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB), Color(0xFF90CAF9)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      appBar: AppBar(
+        title: const Text(
+          "Film Indonesia",
+          style: TextStyle(color: Colors.white),
         ),
+        backgroundColor: Colors.blue,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: loadMovies,
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            AppBar(
-              title: Text(
-                'CineLog+ ($username)',
-                style: const TextStyle(
-                  color: Color(0xFF0D47A1),
-                  fontWeight: FontWeight.bold,
+            TextField(
+              controller: searchC,
+              decoration: InputDecoration(
+                labelText: "Cari film...",
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    searchC.clear();
+                    loadMovies();
+                  },
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              actions: [
-                IconButton(
-                  onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                  icon: const Icon(Icons.logout, color: Color(0xFF0D47A1)),
+              onSubmitted: (v) => searchMovies(),
+            ),
+            const SizedBox(height: 16),
+            if (isLoading)
+              const Expanded(
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            if (isError)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    "Gagal memuat film:\n$errorMsg",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 ),
-              ],
-            ),
-            Expanded(
-  child: movies.isEmpty
-      ? const Center(
-          child: Text(
-            'Belum ada film.\nTekan + untuk menambah.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF1565C0),
-              fontSize: 16,
-            ),
-          ),
-        )
-      : ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: movies.length,
-          itemBuilder: (ctx, i) {
-            return GestureDetector(
-              onTap: () async {
-                final result = await Navigator.pushNamed(
-                  context,
-                  DetailPage.routeName,
-                  arguments: movies[i].id,
-                );
-                if (result == true) await refresh();
-              },
-              child: MovieCard(movie: movies[i]),
-            );
-          },
-        ),
-),
+              ),
+            if (!isLoading && !isError)
+              Expanded(
+                child: movies.isEmpty
+                    ? const Center(child: Text("Tidak ada film ditemukan"))
+                    : ListView.builder(
+                        itemCount: movies.length,
+                        itemBuilder: (context, i) {
+                          return MovieCard(movie: movies[i]);
+                        },
+                      ),
+              ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.pushNamed(
-            context,
-            AddEditPage.routeName,
-          );
-          if (result == true) await refresh();
-        },
-        backgroundColor: const Color(0xFF1E88E5),
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

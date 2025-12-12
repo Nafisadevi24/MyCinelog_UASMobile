@@ -18,4 +18,3 @@ class User {
       };
 }
 
-// Copy kode di atas ke file: models/user_model.dart

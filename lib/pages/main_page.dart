@@ -4,6 +4,7 @@ import '../models/movie_model.dart';
 import 'add_edit_page.dart';
 import 'detail_page.dart';
 import '../widgets/movie_card.dart';
+import '../main.dart'; // supaya CineLogApp kebaca
 
 class MainPage extends StatefulWidget {
   static const routeName = '/main';
@@ -16,8 +17,21 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
   final repo = DataRepository();
+
   String username = '';
-  String query = '';
+
+  /// state untuk API
+  bool _isLoading = false;
+  String? _error;
+
+  // 🔎 controller untuk search
+  final TextEditingController _searchC = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMoviesFromApi(); // panggil TMDB saat pertama kali buka MainPage
+  }
 
   @override
   void didChangeDependencies() {
@@ -26,14 +40,65 @@ class _MainPageState extends State<MainPage> {
     if (arg is String) username = arg;
   }
 
+  @override
+  void dispose() {
+    _searchC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMoviesFromApi() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await repo.loadMoviesFromApi(); // ambil film dari TMDB
+    } catch (e) {
+      _error = e.toString();
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _searchMovies() async {
+    final q = _searchC.text.trim();
+
+    if (q.isEmpty) {
+      await _loadMoviesFromApi();
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await repo.searchMovies(q);
+    } catch (e) {
+      _error = e.toString();
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   void _onItemTapped(int index) => setState(() => _selectedIndex = index);
-  void refresh() async {
-    await repo.reloadMovies();
-    setState(() {});
+
+  Future<void> refresh() async {
+    await _loadMoviesFromApi();
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final pages = [
       _buildHome(),
       _buildAdd(),
@@ -74,9 +139,12 @@ class _MainPageState extends State<MainPage> {
           child: BottomNavigationBar(
             currentIndex: _selectedIndex,
             onTap: _onItemTapped,
-            backgroundColor: Colors.white,
-            selectedItemColor: const Color(0xFF0D47A1),
-            unselectedItemColor: Colors.grey.shade400,
+            backgroundColor: isDark
+                ? (Theme.of(context).bottomNavigationBarTheme.backgroundColor ??
+                      const Color(0xFF1E1E1E))
+                : Colors.white,
+            selectedItemColor: isDark ? Colors.white : const Color(0xFF0D47A1),
+            unselectedItemColor: isDark ? Colors.grey : Colors.grey.shade400,
             type: BottomNavigationBarType.fixed,
             elevation: 0,
             selectedLabelStyle: const TextStyle(
@@ -121,11 +189,82 @@ class _MainPageState extends State<MainPage> {
   Widget _buildHome() {
     final movies = repo.getAllMovies();
     final featured = movies.take(5).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // loading
+    if (_isLoading) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? const [Color(0xFF121212), Color(0xFF1E1E1E)]
+                : const [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // error
+    if (_error != null) {
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark
+                ? const [Color(0xFF121212), Color(0xFF1E1E1E)]
+                : const [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 60,
+                  color: Color(0xFFB71C1C),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Gagal memuat data dari TMDB',
+                  style: TextStyle(
+                    color: Color(0xFF0D47A1),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: refresh,
+                  child: const Text('Coba lagi'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // normal
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
+          colors: isDark
+              ? const [Color(0xFF121212), Color(0xFF1E1E1E)]
+              : const [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -133,23 +272,33 @@ class _MainPageState extends State<MainPage> {
       child: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 120,
+            expandedHeight: 85,
             floating: false,
             pinned: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF1565C0), Color(0xFF1976D2), Color(0xFF1E88E5)],
+                    colors: isDark
+                        ? const [
+                            Color(0xFF121212),
+                            Color(0xFF1E1E1E),
+                            Color(0xFF000000),
+                          ]
+                        : const [
+                            Color(0xFF1565C0),
+                            Color(0xFF1976D2),
+                            Color(0xFF1E88E5),
+                          ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 10, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -217,6 +366,7 @@ class _MainPageState extends State<MainPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // FILM UNGGULAN
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
@@ -230,44 +380,38 @@ class _MainPageState extends State<MainPage> {
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
-                          height: 240,
-                          child: PageView.builder(
-                            controller: PageController(
-                              viewportFraction: 0.85,
-                              initialPage: 0,
-                            ),
+                          height: 230,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: featured.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(width: 12),
                             itemBuilder: (ctx, i) {
                               final movie = featured[i];
+                              final isNetwork = movie.poster.startsWith('http');
+
                               return GestureDetector(
                                 onTap: () async {
-  final result = await Navigator.of(context).push(PageRouteBuilder(
-    transitionDuration: const Duration(milliseconds: 400),
-    reverseTransitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
-      opacity: animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.1, 0.05),
-          end: Offset.zero,
-        ).animate(animation),
-        child: const DetailPage(),
-      ),
-    ),
-    settings: RouteSettings(arguments: movie.id),
-  ));
-  if (result == true) refresh();
-},
+                                  final result = await Navigator.pushNamed(
+                                    context,
+                                    DetailPage.routeName,
+                                    arguments: movie.id,
+                                  );
+                                  if (result == true) {
+                                    setState(() {});
+                                  }
+                                },
                                 child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 8),
+                                  width: 260,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(20),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: const Color(0xFF1976D2).withOpacity(0.3),
-                                        blurRadius: 15,
-                                        offset: const Offset(0, 8),
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
                                       ),
                                     ],
                                   ),
@@ -276,16 +420,20 @@ class _MainPageState extends State<MainPage> {
                                     child: Stack(
                                       fit: StackFit.expand,
                                       children: [
-                                        Image.asset(
-                                          movie.poster,
-                                          fit: BoxFit.cover,
-                                        ),
+                                        isNetwork
+                                            ? Image.network(
+                                                movie.poster,
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Image.asset(
+                                                movie.poster,
+                                                fit: BoxFit.cover,
+                                              ),
                                         Container(
                                           decoration: BoxDecoration(
                                             gradient: LinearGradient(
                                               colors: [
-                                                const Color(0xFF0D47A1).withOpacity(0.8),
-                                                Colors.transparent,
+                                                Colors.black.withOpacity(0.65),
                                                 Colors.transparent,
                                               ],
                                               begin: Alignment.bottomCenter,
@@ -294,29 +442,29 @@ class _MainPageState extends State<MainPage> {
                                           ),
                                         ),
                                         Positioned(
-                                          bottom: 16,
                                           left: 16,
                                           right: 16,
+                                          bottom: 16,
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
                                                 movie.judul,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 18,
-                                                ),
                                                 maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                               const SizedBox(height: 4),
                                               Row(
                                                 children: [
                                                   const Icon(
                                                     Icons.star,
-                                                    color: Color(0xFF42A5F5),
+                                                    color: Colors.orange,
                                                     size: 16,
                                                   ),
                                                   const SizedBox(width: 4),
@@ -341,7 +489,46 @@ class _MainPageState extends State<MainPage> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 32),
+
+                        const SizedBox(height: 24),
+
+                        // SEARCH BAR
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: TextField(
+                            controller: _searchC,
+                            decoration: InputDecoration(
+                              hintText: 'Cari film...',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchC.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () {
+                                        _searchC.clear();
+                                        _loadMoviesFromApi();
+                                      },
+                                    )
+                                  : null,
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 0,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            textInputAction: TextInputAction.search,
+                            onChanged: (_) => setState(() {}),
+                            onSubmitted: (_) => _searchMovies(),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // SEMUA FILM
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 20),
                           child: Text(
@@ -369,7 +556,6 @@ class _MainPageState extends State<MainPage> {
                                 );
                                 if (result == true) {
                                   setState(() {});
-                                  refresh(); // hanya refresh kalau benar-benar ada perubahan
                                 }
                               },
                               child: MovieCard(movie: movies[i]),
@@ -388,10 +574,14 @@ class _MainPageState extends State<MainPage> {
 
   // ➕ TAMBAH PAGE
   Widget _buildAdd() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1976D2), Color(0xFF2196F3), Color(0xFF42A5F5)],
+          colors: isDark
+              ? const [Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF000000)]
+              : const [Color(0xFF1976D2), Color(0xFF2196F3), Color(0xFF42A5F5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -435,10 +625,7 @@ class _MainPageState extends State<MainPage> {
                 child: Text(
                   'Simpan film favoritmu dan bagikan pengalamanmu',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.white,
-                  ),
+                  style: TextStyle(fontSize: 15, color: Colors.white),
                 ),
               ),
               const SizedBox(height: 40),
@@ -457,23 +644,27 @@ class _MainPageState extends State<MainPage> {
                   shadowColor: Colors.black26,
                 ),
                 onPressed: () async {
-  final result = await Navigator.of(context).push(PageRouteBuilder(
-    transitionDuration: const Duration(milliseconds: 400),
-    reverseTransitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, animation, secondaryAnimation) => FadeTransition(
-      opacity: animation,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.1, 0.05),
-          end: Offset.zero,
-        ).animate(animation),
-        child: const AddEditPage(),
-      ),
-    ),
-  ));
-  if (result == true) refresh();
-},
-
+                  final result = await Navigator.of(context).push(
+                    PageRouteBuilder(
+                      transitionDuration: const Duration(milliseconds: 400),
+                      reverseTransitionDuration: const Duration(
+                        milliseconds: 300,
+                      ),
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.1, 0.05),
+                                end: Offset.zero,
+                              ).animate(animation),
+                              child: const AddEditPage(),
+                            ),
+                          ),
+                    ),
+                  );
+                  if (result == true) setState(() {});
+                },
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -500,11 +691,14 @@ class _MainPageState extends State<MainPage> {
   Widget _buildExplorePage() {
     final movies = repo.getAllMovies();
     final genres = movies.map((m) => m.genre).toSet().toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2)],
+          colors: isDark
+              ? const [Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF000000)]
+              : const [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -538,9 +732,9 @@ class _MainPageState extends State<MainPage> {
             ),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF121212) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(30),
                   ),
                 ),
@@ -558,12 +752,13 @@ class _MainPageState extends State<MainPage> {
                         padding: const EdgeInsets.all(20),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          childAspectRatio: 1.5,
-                        ),
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 1.5,
+                            ),
                         itemCount: genres.length,
+                        // di dalam GridView.builder, itemBuilder:
                         itemBuilder: (ctx, index) {
                           final genre = genres[index];
                           final colors = [
@@ -585,7 +780,10 @@ class _MainPageState extends State<MainPage> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => _buildGenreDetailPage(
-                                      genre, filtered, colorPair),
+                                    genre,
+                                    filtered,
+                                    colorPair,
+                                  ),
                                 ),
                               );
                             },
@@ -629,7 +827,10 @@ class _MainPageState extends State<MainPage> {
   }
 
   Widget _buildGenreDetailPage(
-      String genre, List<dynamic> movies, List<Color> colors) {
+    String genre,
+    List<Movie> movies,
+    List<Color> colors,
+  ) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -658,42 +859,40 @@ class _MainPageState extends State<MainPage> {
           ),
         ),
         body: ListView.builder(
-  padding: const EdgeInsets.all(16),
-  itemCount: movies.length,
-  itemBuilder: (ctx, i) {
-    final movie = movies[i];
-    return GestureDetector(
-      onTap: () async {
-        // buka halaman detail
-        final result = await Navigator.pushNamed(
-          context,
-          DetailPage.routeName,
-          arguments: movies[i].id,
-        );
-
-        // kalau film diedit atau dihapus, refresh halaman explore
-        if (result == true) {
-          setState(() {});
-          refresh();
-        }
-      },
-      child: MovieCard(movie: movie),
-    );
-  },
-),
-
+          padding: const EdgeInsets.all(16),
+          itemCount: movies.length,
+          itemBuilder: (ctx, i) {
+            final movie = movies[i];
+            return GestureDetector(
+              onTap: () async {
+                final result = await Navigator.pushNamed(
+                  context,
+                  DetailPage.routeName,
+                  arguments: movie.id,
+                );
+                if (result == true) {
+                  setState(() {});
+                }
+              },
+              child: MovieCard(movie: movie),
+            );
+          },
+        ),
       ),
     );
   }
 
   // ❤️ FAVORIT PAGE
   Widget _buildFavorites() {
-    final fav = repo.getAllMovies().where((m) => m.rating == 5).toList();
+    final fav = repo.getAllMovies().where((m) => m.rating >= 4).toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1565C0), Color(0xFF1976D2), Color(0xFF2196F3)],
+          colors: isDark
+              ? const [Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF000000)]
+              : const [Color(0xFF1565C0), Color(0xFF1976D2), Color(0xFF2196F3)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -716,7 +915,7 @@ class _MainPageState extends State<MainPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '${fav.length} film dengan rating 5 bintang',
+                    '${fav.length} film dengan rating minimal 4',
                     style: TextStyle(
                       fontSize: 15,
                       color: Colors.white.withOpacity(0.9),
@@ -727,9 +926,9 @@ class _MainPageState extends State<MainPage> {
             ),
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF121212) : Colors.white,
+                  borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(30),
                   ),
                 ),
@@ -754,7 +953,7 @@ class _MainPageState extends State<MainPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Film dengan rating 5 bintang\nakan muncul di sini',
+                              'Film dengan rating tinggi\nakan muncul di sini',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.blue.shade700,
@@ -781,12 +980,17 @@ class _MainPageState extends State<MainPage> {
   Widget _buildAccount() {
     final movies = repo.getAllMovies();
     final totalMovies = movies.length;
-    final favoriteMovies = movies.where((m) => m.rating == 5).length;
+    final favoriteMovies = movies.where((m) => m.rating >= 4).length;
+
+    // cek sekarang lagi mode dark atau light
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2)],
+          colors: isDark
+              ? const [Color(0xFF121212), Color(0xFF1E1E1E), Color(0xFF000000)]
+              : const [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1976D2)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -838,7 +1042,34 @@ class _MainPageState extends State<MainPage> {
                 color: Colors.white.withOpacity(0.9),
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
+
+            // 🔘 SWITCH DARK MODE
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: SwitchListTile(
+                  value: isDark,
+                  onChanged: (value) {
+                    // panggil root untuk ganti theme
+                    CineLogApp.of(context).toggleTheme(value);
+                  },
+                  title: const Text(
+                    'Mode Gelap',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  secondary: const Icon(Icons.dark_mode, color: Colors.white),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            // 📊 statistik film
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Row(
@@ -861,7 +1092,10 @@ class _MainPageState extends State<MainPage> {
                 ],
               ),
             ),
+
             const SizedBox(height: 40),
+
+            // 🔐 tombol logout
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: ElevatedButton(
@@ -900,7 +1134,7 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-    Widget _buildStatCard(String label, String value, IconData icon) {
+  Widget _buildStatCard(String label, String value, IconData icon) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(

@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
+  http: ^1.2.0     # <--- TAMBAH INI
   shared_preferences: ^2.2.2
   localstorage: ^4.0.1+4
 

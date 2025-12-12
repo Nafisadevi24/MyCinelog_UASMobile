@@ -4,10 +4,17 @@ import '../models/movie_model.dart';
 class MovieCard extends StatelessWidget {
   final Movie movie;
   final VoidCallback? onTap;
-  const MovieCard({Key? key, required this.movie, this.onTap}) : super(key: key);
+
+  const MovieCard({
+    Key? key,
+    required this.movie,
+    this.onTap,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final isNetwork = movie.poster.startsWith('http');
+
     return GestureDetector(
       onTap: onTap,
       child: Card(
@@ -20,7 +27,7 @@ class MovieCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Poster dengan shadow
+              // Poster
               Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
@@ -34,35 +41,30 @@ class MovieCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.asset(
-                    movie.poster,
-                    width: 70,
-                    height: 100,
-                    fit: BoxFit.cover,
-                    errorBuilder: (ctx, err, st) => Container(
-                      width: 70,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            const Color(0xFF1976D2),
-                            const Color(0xFF2196F3),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                  child: isNetwork
+                      ? Image.network(
+                          movie.poster,
+                          width: 70,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, st) => _fallbackPoster(),
+                        )
+                      : Image.asset(
+                          movie.poster,
+                          width: 70,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (ctx, err, st) => _fallbackPoster(),
                         ),
-                      ),
-                      child: const Icon(Icons.movie, color: Colors.white, size: 40),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(width: 12),
+
+              // Info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Judul Film
                     Text(
                       movie.judul,
                       style: const TextStyle(
@@ -75,8 +77,6 @@ class MovieCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
-                    
-                    // Genre & Tahun
                     Row(
                       children: [
                         Container(
@@ -109,8 +109,6 @@ class MovieCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    
-                    // Rating dengan background kontras
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -134,7 +132,8 @@ class MovieCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star, color: Colors.white, size: 16),
+                          const Icon(Icons.star,
+                              color: Colors.white, size: 16),
                           const SizedBox(width: 4),
                           Text(
                             '${movie.rating}',
@@ -148,8 +147,6 @@ class MovieCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    
-                    // Status
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -175,6 +172,21 @@ class MovieCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _fallbackPoster() {
+    return Container(
+      width: 70,
+      height: 100,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1976D2), Color(0xFF2196F3)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Icon(Icons.movie, color: Colors.white, size: 40),
     );
   }
 }
